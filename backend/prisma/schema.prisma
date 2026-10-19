@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Define os status possíveis dos equipamentos
+enum EquipmentStatus {
+  DISPONIVEL
+  ALUGADO
+  MANUTENCAO
+}
+
+model Category {
+  id         String      @id @default(uuid())
+  name       String      @unique
+  equipments Equipment[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model Equipment {
+  id           String          @id @default(uuid())
+  name         String
+  description  String?
+  categoryId   String
+  category     Category        @relation(fields: [categoryId], references: [id])
+  status       EquipmentStatus @default(DISPONIVEL) // Agora usando o Enum nativo do PostgreSQL
+  serialNumber String          @unique
+  quantity     Int             @default(1)
+  manualUrl    String?         // URL para o PDF do manual
+  imageUrl     String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  rentals      Rental[]
+  maintenances Maintenance[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("CLIENT") // ADMIN ou CLIENT
+  points    Int      @default(0)        // Sistema de Bonificação por bom uso
+  rentals   Rental[]
+  createdAt DateTime @default(now())
+}
+
+model Rental {
+  id                String    @id @default(uuid())
+  startDate         DateTime  @default(now())
+  expectedReturn    DateTime
+  actualReturn      DateTime?
+  status            String    @default("ACTIVE") // ACTIVE, FINISHED
+  
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  equipmentId       String
+  equipment         Equipment @relation(fields: [equipmentId], references: [id])
+
+  // Campos para a regra de negócio de bonificação
+  conditionOnReturn String?   // Ex: "BOM", "DANIFICADO"
+  pointsEarned      Int       @default(0)
+}
+
+model Maintenance {
+  id            String    @id @default(uuid())
+  equipmentId   String
+  equipment     Equipment @relation(fields: [equipmentId], references: [id])
+  type          String    // Ex: PREVENTIVA, CORRETIVA
+  cost          Float
+  startDate     DateTime  @default(now())
+  endDate       DateTime?
+  description   String
+  partsReplaced String?   // Histórico de peças trocadas
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
