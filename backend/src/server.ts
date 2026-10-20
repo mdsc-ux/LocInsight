@@ -2,7 +2,8 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import dotenv from "dotenv";
-import router from "./routes";
+import { criarRotas } from "./routes";
+import { prisma } from "./lib/prisma";
 
 dotenv.config();
 
@@ -28,7 +29,7 @@ app.use(
 );
 
 // Registrar rotas da API
-app.use("/api", router);
+app.use("/api", criarRotas(prisma));
 
 // Rota principal
 app.get("/", (req, res) => {
