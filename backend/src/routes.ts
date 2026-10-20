@@ -1,5 +1,5 @@
 
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import type { PrismaClient, EquipmentStatus } from "@prisma/client";
 import multer from "multer";
 import path from "path";
@@ -12,28 +12,49 @@ const uploadDir = path.resolve(
 
 fs.mkdirSync(uploadDir, { recursive: true });
 
+const publicApiUrl = (
+  process.env.PUBLIC_API_URL ||
+  "https://locinsight-backend.onrender.com"
+).replace(/\/$/, "");
+
+const fileUrl = (filename: string) =>
+  `${publicApiUrl}/uploads/${filename}`;
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) =>
-    cb(
-      null,
-      `${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`
-    )
+  filename: (_req, file, cb) => {
+    const extension = path.extname(file.originalname).toLowerCase();
+    cb(null, `${crypto.randomUUID()}${extension}`);
+  }
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024, files: 2 },
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 2
+  },
   fileFilter: (_req, file, cb) => {
-    const ok =
-      file.mimetype.startsWith("image/") ||
-      file.mimetype === "application/pdf";
+    const imageField = ["image", "imageFile"].includes(file.fieldname);
+    const manualField = ["manual", "manualFile"].includes(file.fieldname);
 
-    if (!ok) {
-      return cb(new Error("Somente imagens e PDF são permitidos"));
+    if (imageField && file.mimetype.startsWith("image/")) {
+      return cb(null, true);
     }
 
-    cb(null, true);
+    if (manualField && file.mimetype === "application/pdf") {
+      return cb(null, true);
+    }
+
+    return cb(
+      new Error(
+        imageField
+          ? "A imagem deve ser um arquivo de imagem"
+          : manualField
+          ? "O manual deve ser um PDF"
+          : "Campo de arquivo não reconhecido"
+      )
+    );
   }
 });
 
@@ -110,18 +131,10 @@ const wrap =
       console.error(e);
 
       if (e?.code === "P2002")
-        return fail(
-          res,
-          "Registro duplicado (nome, email ou número de série)",
-          409
-        );
+        return fail(res, "Registro duplicado", 409);
 
       if (e?.code === "P2003")
-        return fail(
-          res,
-          "Registro relacionado não encontrado",
-          400
-        );
+        return fail(res, "Registro relacionado não encontrado", 400);
 
       if (e?.code === "P2025")
         return fail(res, "Registro não encontrado", 404);
@@ -129,6 +142,32 @@ const wrap =
       return fail(res, "Erro interno do servidor", 500);
     }
   };
+
+const uploadFiles = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  fileFields(req, res, (err: any) => {
+    if (!err) return next();
+
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE")
+        return fail(res, "Cada arquivo pode ter no máximo 10 MB");
+
+      if (err.code === "LIMIT_FILE_COUNT")
+        return fail(res, "Envie no máximo dois arquivos");
+
+      if (err.code === "LIMIT_UNEXPECTED_FILE")
+        return fail(
+          res,
+          `Campo de arquivo inesperado: ${err.field || "desconhecido"}`
+        );
+    }
+
+    return fail(res, err?.message || "Falha ao enviar arquivos");
+  });
+};
 
 export function criarRotas(prisma: PrismaClient) {
   const router = Router();
@@ -163,7 +202,7 @@ export function criarRotas(prisma: PrismaClient) {
     })
   );
 
-  // DADOS DE DEMONSTRAÇÃO
+  // SEED
 
   router.post(
     "/seed",
@@ -222,14 +261,13 @@ export function criarRotas(prisma: PrismaClient) {
 
   router.get(
     "/categories",
-    wrap(async (_req, res) =>
-      success(
-        res,
-        await prisma.category.findMany({
-          orderBy: { name: "asc" }
-        })
-      )
-    )
+    wrap(async (_req, res) => {
+      const categories = await prisma.category.findMany({
+        orderBy: { name: "asc" }
+      });
+
+      return success(res, categories);
+    })
   );
 
   router.post(
@@ -240,13 +278,11 @@ export function criarRotas(prisma: PrismaClient) {
       if (!name)
         return fail(res, "Informe o nome da categoria");
 
-      return success(
-        res,
-        await prisma.category.create({
-          data: { name }
-        }),
-        201
-      );
+      const category = await prisma.category.create({
+        data: { name }
+      });
+
+      return success(res, category, 201);
     })
   );
 
@@ -382,11 +418,11 @@ export function criarRotas(prisma: PrismaClient) {
           : {}),
 
         ...(image
-          ? { imageUrl: `/uploads/${image.filename}` }
+          ? { imageUrl: fileUrl(image.filename) }
           : {}),
 
         ...(manual
-          ? { manualUrl: `/uploads/${manual.filename}` }
+          ? { manualUrl: fileUrl(manual.filename) }
           : {})
       };
 
@@ -419,13 +455,13 @@ export function criarRotas(prisma: PrismaClient) {
 
   router.post(
     "/equipments",
-    fileFields,
+    uploadFiles,
     saveEquipment(false)
   );
 
   router.put(
     "/equipments/:id",
-    fileFields,
+    uploadFiles,
     saveEquipment(true)
   );
 
@@ -482,12 +518,7 @@ export function criarRotas(prisma: PrismaClient) {
       const email = str(req.body?.email).toLowerCase();
       const password = str(req.body?.password);
 
-      if (
-        !name ||
-        !email ||
-        !password ||
-        password.length < 8
-      )
+      if (!name || !email || !password || password.length < 8)
         return fail(
           res,
           "Nome, email e senha (mínimo 8 caracteres) são obrigatórios"
@@ -727,9 +758,7 @@ export function criarRotas(prisma: PrismaClient) {
           if (!changed.count) return null;
 
           const r = await tx.rental.findUniqueOrThrow({
-            where: {
-              id: String(req.params.id)
-            }
+            where: { id: String(req.params.id) }
           });
 
           await tx.equipment.update({
