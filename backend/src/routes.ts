@@ -204,7 +204,10 @@ export function criarRotas(prisma: PrismaClient) {
             password: hashPassword(password),
             role: "ADMIN"
           },
-          update: { role: "ADMIN" }
+          update: {
+            role: "ADMIN",
+            password: hashPassword(password)
+          }
         });
       }
 
