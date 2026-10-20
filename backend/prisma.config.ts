@@ -1,8 +1,12 @@
+
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
-// Tenta pegar do .env, se falhar ou estiver vazio (por conta do OneDrive), coloca a sua string do Postgres
-const postgresUrl = process.env.DATABASE_URL || "postgresql://postgres:suasenha@localhost:5432/locinsight?schema=public";
+const postgresUrl = process.env.DATABASE_URL;
+
+if (!postgresUrl) {
+  throw new Error("DATABASE_URL não configurada");
+}
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
