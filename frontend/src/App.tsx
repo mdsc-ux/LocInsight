@@ -293,7 +293,7 @@ function App() {
       setLoginPassword('admin_password');
     } else {
       setLoginEmail('jose@construtorasilva.com');
-      setLoginPassword('jose123');
+      setLoginPassword('jose1234');
     }
   };
 
