@@ -23,10 +23,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Servir arquivos estáticos (fotos e manuais PDF)
-app.use(
-  "/uploads",
-  express.static(path.join(__dirname, "../../uploads"))
+const uploadsDir = path.resolve(
+  process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads")
 );
+
+app.use("/uploads", express.static(uploadsDir));
 
 // Registrar rotas da API
 app.use("/api", criarRotas(prisma));
