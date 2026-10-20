@@ -28,6 +28,39 @@ export function criarRotas(prisma: PrismaClient) {
     }
   });
 
+  
+router.post("/categories", async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: { message: "Informe o nome da categoria" }
+      });
+    }
+
+    const category = await prisma.category.create({
+      data: {
+        name: name.trim()
+      }
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: category
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      error: { message: "Erro ao cadastrar categoria" }
+    });
+  }
+});
+
+
   router.get("/equipments", async (req, res) => {
     try {
       const { search, categoryId, status } = req.query;
