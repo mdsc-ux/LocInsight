@@ -6,51 +6,15 @@ import { criarRotas } from "./routes";
 import { prisma } from "./lib/prisma";
 
 dotenv.config();
-
 const app = express();
 const PORT = process.env.PORT || 3000;
+const uploadsDir = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads"));
 
-// Configurar CORS
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
-
+app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], allowedHeaders: ["Content-Type", "Authorization"] }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Servir arquivos estáticos (fotos e manuais PDF)
-const uploadsDir = path.resolve(
-  process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads")
-);
-
 app.use("/uploads", express.static(uploadsDir));
-
-// Registrar rotas da API
 app.use("/api", criarRotas(prisma));
-
-// Rota principal
-app.get("/", (req, res) => {
-  res.json({
-    mensagem: "API Loc Insight funcionando!",
-  });
-});
-
-// Rota de saúde
-app.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    service: "LocInsight API",
-  });
-});
-
-// Inicializar servidor
-app.listen(PORT, () => {
-  console.log("====================================");
-  console.log(`Servidor Loc Insight rodando na porta ${PORT}`);
-  console.log(`Pasta de uploads disponível em /uploads`);
-  console.log("====================================");
-});
+app.get("/", (_req, res) => res.json({ mensagem: "API Loc Insight funcionando!" }));
+app.get("/health", (_req, res) => res.json({ status: "ok", service: "LocInsight API" }));
+app.listen(PORT, () => console.log(`Loc Insight API na porta ${PORT}`));
