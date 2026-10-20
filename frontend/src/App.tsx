@@ -290,10 +290,10 @@ function App() {
   const loginQuickly = (role: 'ADMIN' | 'CLIENT') => {
     if (role === 'ADMIN') {
       setLoginEmail('admin@locinsight.com');
-      setLoginPassword('admin_password');
+      setLoginPassword('senha123_criptografada');
     } else {
       setLoginEmail('jose@construtorasilva.com');
-      setLoginPassword('senha123_criptografada');
+      setLoginPassword('jose123');
     }
   };
 
